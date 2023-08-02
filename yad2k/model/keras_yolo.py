@@ -87,6 +87,11 @@ def yolo_head(feats, anchors, num_classes):
     num_anchors = len(anchors)
 
     # Reshape to batch, height, width, num_anchors, box_params.
+
+    # This function is used to convert the final layer features of a YOLO model to bounding box parameters
+
+    # The first dimension is the batch size. The second and third dimensions are the height and width of the feature map. The fourth dimension is the number of anchors. The fifth dimension is the number of box parameters per anchor (2).
+
     anchors_tensor = K.reshape(K.variable(anchors), [1, 1, 1, num_anchors, 2])
 
     conv_dims = K.shape(feats)[1:3]  # Assuming channels last
@@ -187,6 +192,7 @@ def yolo_loss(args, anchors, num_classes, rescore_confidence=False, print_loss=F
     pred_boxes = K.concatenate(
         (K.sigmoid(feats[..., 0:2]), feats[..., 2:4]), axis=-1)
 
+    # The tf.expand_dims() function in TensorFlow is used to insert a dimension of length 1 at the specified axis of a tensor. This can be useful for a variety of tasks
     pred_xy = K.expand_dims(pred_xy, 4)
     pred_wh = K.expand_dims(pred_wh, 4)
 
@@ -194,6 +200,7 @@ def yolo_loss(args, anchors, num_classes, rescore_confidence=False, print_loss=F
     pred_mins = pred_xy - pred_wh_half
     pred_maxes = pred_xy + pred_wh_half
 
+    # Returns the symbolic shape of a tensor or variable.
     true_boxes_shape = K.shape(true_boxes)
 
     # batch, conv_height, conv_width, num_anchors, num_true_boxes, box_params
@@ -208,7 +215,9 @@ def yolo_loss(args, anchors, num_classes, rescore_confidence=False, print_loss=F
     true_mins = true_xy - true_wh_half
     true_maxes = true_xy + true_wh_half
 
+    # Element-wise maximum of two tensors.
     intersect_mins = K.maximum(pred_mins, true_mins)
+    # Element-wise minimum of two tensors.
     interset_maxes = K.minimum(pred_maxes, true_maxes)
     intersect_wh = K.maximum(interset_maxes - intersect_mins, 0.)
     intersect_areas = intersect_wh[..., 0] * intersect_wh[..., 1]
@@ -220,10 +229,15 @@ def yolo_loss(args, anchors, num_classes, rescore_confidence=False, print_loss=F
     iou_scores = intersect_areas / union_areas
 
     # Best IOUs for each locations.
+    # Returns the maximum from the 4th index
     best_ious = K.max(iou_scores, axis=4)
+
+    # Adds a 1-sized dimension at index "axis"
     best_ious = K.expand_dims(best_ious)
 
     # A detector has found an object if IOU > thresh for some true box.
+
+    # Casts a tensor to a different dtype and returns it.
     object_detections = K.cast(best_ious > 0.6, K.dtype(best_ious))
 
     # TODO: Darknet region training includes extra coordinate loss for early
@@ -273,8 +287,13 @@ def yolo_loss(args, anchors, num_classes, rescore_confidence=False, print_loss=F
 
 def yolo(inputs, anchors, num_classes):
     """Generate a complete YOLO_v2 localization model."""
+
     num_anchors = len(anchors)
+
+    # Process the image and generates the output
     body = yolo_body(inputs, num_anchors, num_classes)
+
+    # Takes the output from the body i.e. architecture and makes the data i.e. different outputs in the required format
     outputs = yolo_head(body.output, anchors, num_classes)
     return outputs
 
@@ -283,10 +302,15 @@ def yolo_filter_boxes(box_confidence, boxes, box_class_probs, threshold=.6):
     """Filter YOLO boxes based on object and class confidence."""
 
     box_scores = box_confidence * box_class_probs
+
+    # Returns the "index" of the maximum value along an axis,  If the axis argument is set to -1, then the maximum value will be found along the last axis.
     box_classes = K.argmax(box_scores, axis=-1)
+
+    # Returns maximum "value" in a tensor.
     box_class_scores = K.max(box_scores, axis=-1)
     prediction_mask = box_class_scores >= threshold
 
+    # Apply boolean mask to tensor, Returns only those values whose's mask value is equal to true
     boxes = tf.boolean_mask(boxes, prediction_mask)
     scores = tf.boolean_mask(box_class_scores, prediction_mask)
     classes = tf.boolean_mask(box_classes, prediction_mask)
@@ -296,6 +320,7 @@ def yolo_filter_boxes(box_confidence, boxes, box_class_probs, threshold=.6):
 
 def yolo_eval(yolo_outputs, image_shape, max_boxes=10, score_threshold=.6, iou_threshold=.5):
     """Evaluate YOLO model on given input batch and return filtered boxes."""
+
     box_confidence, box_xy, box_wh, box_class_probs = yolo_outputs
     boxes = yolo_boxes_to_corners(box_xy, box_wh)
     boxes, scores, classes = yolo_filter_boxes(
@@ -310,8 +335,12 @@ def yolo_eval(yolo_outputs, image_shape, max_boxes=10, score_threshold=.6, iou_t
 
     max_boxes_tensors = K.variable(max_boxes, dtype='int32')
     K.get_session().run(tf.initializers([max_boxes_tensors]))
+
+    # Greedily selects a subset of bounding boxes in descending order of score, Prunes away boxes that have high intersection-over-union (IOU) overlap with previously selected boxes.
     nms_index = tf.image.non_max_suppression(
         boxes, scores, max_boxes_tensors, iou_threshold=iou_threshold)
+
+    # Retrieves the elements of indices in the tensor reference.
     boxes = K.gather(boxes, nms_index)
     scores = K.gather(scores, nms_index)
     classes = K.gather(classes, nms_index)
@@ -347,11 +376,13 @@ def preprocess_true_boxes(true_boxes, anchors, image_size):
 
     height, width = image_size
     num_anchors = len(anchors)
+
     # Downsampling factor of 5x 2-stride max_pools == 32
     assert height % 32 == 0, 'Image size in YOLO_v2 must be multiples of 32.'
     assert width % 32 == 0, 'Image size in YOLO_v2 must be multiples of 32.'
     conv_height = height // 32
     conv_width = width // 32
+
     num_box_params = true_boxes.shape[1]
     detectors_mask = np.zeros(
         (conv_height, conv_width, num_anchors, 1), dtype=np.float32)
