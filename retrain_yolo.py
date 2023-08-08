@@ -17,7 +17,7 @@ from PIL import Image
 
 from yad2k.model.keras_yolo import (
     preprocess_true_boxes, yolo_body, yolo_eval, yolo_head, yolo_loss)
-from yad2k.utils.utils.draw_boxes import draw
+from yolo_utils import draw_boxes
 
 """
 COMMAND FOR RUNNING THE FILE
@@ -324,7 +324,7 @@ def draw(model_body, class_names, anchors, image_data, image_set='val',
                                       class_names, out_scores)
         # Save the image:
         if save_all or (len(out_boxes) > 0):
-            image = PIL.Image.fromarray(image_with_boxes)
+            image = Image.fromarray(image_with_boxes)
             image.save(os.path.join(out_path, str(i)+'.png'))
 
         # To display (pauses the program):
