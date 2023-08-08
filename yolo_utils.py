@@ -5,6 +5,7 @@ import imghdr
 # OS routines for NT or Posix depending on what system we're on.
 import os
 import random
+import tensorflow as tf
 from keras import backend as K
 import numpy as np
 # PIL = Python Image Libray
@@ -13,7 +14,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 def read_classes(classes_path):
     with open(classes_path) as f:
-        class_name = [c.strip() for c in class_name]
+        class_name = [c.strip() for c in classes_path]
         return class_name
 
 

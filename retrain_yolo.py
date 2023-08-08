@@ -1,46 +1,28 @@
 """
 This is a script that can be used to retrain the YOLOv3 model for your own dataset
 """
+from yolo_utils import draw_boxes
 import argparse
 import os
 import matplotlib.pyplot as plt
 import numpy as np
-import PIL
+from PIL import Image
 import tensorflow as tf
 from keras import backend as K
 from keras.layers import Input, Lambda, Conv2D
 from keras.models import load_model, Model
 from keras.callbacks import TensorBoard, ModelCheckpoint, EarlyStopping
 
+from PIL import Image
+
 from yad2k.model.keras_yolo import (
     preprocess_true_boxes, yolo_body, yolo_eval, yolo_head, yolo_loss)
-from yolo_utils import draw_boxes
+from yad2k.utils.utils.draw_boxes import draw
 
-# Args
-argparser = argparse.ArgumentParser(
-    description="Retrain or 'fine-tune' a pretrained YOLOv2 model for your own data."
-)
-
-argparser.add_argument(
-    '-d',
-    '--data_path',
-    help="path to numpy data file (.npz) containing np.object array 'boxes and np.uint8 array 'images'",
-    default=os.path.join('..', 'DATA', 'underwater_data.npz')
-)
-
-argparser.add_argument(
-    '-a',
-    '--anchors_path',
-    help='path to anchors file, defaults to yolo_anchors.txt',
-    default=os.path.join('model_data', 'yolo_anchors.txt')
-)
-
-argparser.add_argument(
-    '-c',
-    '--classes_path',
-    help='path to classes file, defaults to pascal_classes.txt',
-    default=os.path.join('..', 'DATA', 'underwater_classes.txt')
-)
+"""
+COMMAND FOR RUNNING THE FILE
+python retrain_yolo.py --data_path=data/images/data.npz --anchors_path=data/pretrained_model/yolo_anchors.txt --classes_path=data/pretrained_model/classes.txt
+"""
 
 # Default anchor boxes
 YOLO_ANCHORS = np.array(
@@ -57,11 +39,12 @@ def _main(args):
     class_names = get_classes(classes_path)
     anchors = get_anchors(anchors_path)
 
-    data = np.load(data_path)  # Custom data saved as a numpy file.
+    # Custom data saved as a numpy file.
+    data = np.load(data_path, allow_pickle=True)
     # has 2 arrays: an object array 'boxes' (variable length of boxes in each image)
     # and an array of imagges 'images'
 
-    image_data, boxes = process_data(data['images', data['boxes']])
+    image_data, boxes = process_data(data['images'], data['boxes'])
 
     anchors = YOLO_ANCHORS
 
@@ -108,16 +91,25 @@ def get_anchors(anchors_path):
 
 def process_data(images, boxes=None):
     '''Process the data'''
-    images = [PIL.Image.from_array(i) for i in images]
-    orig_size = np.array([images[0].width, images[0].height])
+    print('1-----------------------')
+    # images_list = [i for i in images]
+    images_list = [Image.fromarray(np.frombuffer(
+        i.tobytes(), dtype=np.uint8)) for i in images]
+    orig_size = np.array([images_list[0].width, images_list[0].height])
     orig_size = np.expand_dims(orig_size, axis=0)
 
+    print('2-----------------------')
+
     # Image Preprocessing
-    processed_images = [i.resize((416, 416), PIL.Image.BICUBIC)
-                        for i in images]
-    processed_images = [np.array(images, dtype=np.float)
-                        for image in process_data]
-    processed_images = [images/255. for image in processed_images]
+    processed_images = [i.resize((416, 416), Image.Resampling.BICUBIC)
+                        for i in images_list]
+    print('*1')
+    processed_images = [np.array(image, dtype=np.float)
+                        for image in processed_images]
+    print('*2')
+    processed_images = [image/255. for image in processed_images]
+
+    print('3-----------------------')
 
     if boxes is not None:
         # Box preprocessing.
@@ -125,6 +117,8 @@ def process_data(images, boxes=None):
         boxes = [box.rehsape(-1, 5) for box in boxes]
         # Get extents as y_min, x_min, y_max, x_max, class for comparision with model output
         boxes_extents = [box[:, [2, 1, 4, 3, 0]] for box in boxes]
+
+        print('3.5-----------------------')
 
         # Get box parameters as x_center, y_center, box_width, box_height, class.
         boxes_xy = [0.5 * (box[:, 3:5] + box[:, 1:3]) for box in boxes]
@@ -134,11 +128,15 @@ def process_data(images, boxes=None):
         boxes = [np.concatenate(
             (boxes_xy[i], boxes_wh[i], box[:, 0:1]), axis=1) for i, box in enumerate(boxes)]
 
+        print('4-----------------------')
+
         # Find the max numbers of boxes
         max_boxes = 0
         for boxz in boxes:
             if boxz.shape[0] > max_boxes:
                 max_boxes = boxz.shape[0]
+
+        print('5-----------------------')
 
         # add zero pad for training
         for i, boxz in enumerate(boxes):
@@ -147,6 +145,8 @@ def process_data(images, boxes=None):
                     (max_boxes - boxz.shape[0], 5), dtype=np.float32)
                 # Stack arrays in sequence vertically (row wise).
                 boxes[i] = np.vstack((boxz, zero_padding))
+
+        print('6-----------------------')
 
         return np.array(processed_images), np.array(boxes)
     else:
@@ -348,5 +348,29 @@ def draw(model_body, class_names, anchors, image_data, image_set='val',
 
 
 if __name__ == '__main__':
-    args = argparse.parse_args()
+
+    argparser = argparse.ArgumentParser()
+
+    # # Args
+    # argparser.add_argument(
+    #     metavar="Retrain or 'fine-tune' a pretrained YOLOv2 model for your own data.",
+    #     dest='input'
+    # )
+
+    argparser.add_argument(
+        '--data_path',
+        help="path to numpy data file (.npz) containing np.object array 'boxes and np.uint8 array 'images'"
+    )
+
+    argparser.add_argument(
+        '--anchors_path',
+        help='path to anchors file, defaults to yolo_anchors.txt'
+    )
+
+    argparser.add_argument(
+        '--classes_path',
+        help='path to classes file, defaults to classes.txt'
+    )
+
+    args = argparser.parse_args()
     _main(args)

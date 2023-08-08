@@ -1,0 +1,12 @@
+numpy=1.19.5
+argparse
+os
+matplotlib=3.5.2
+pillow=9.2.0
+tensorflow=2.9.2
+keras=2.9.0
+xml
+h5py=3.1.0
+random
+colorsys
+imghdr
