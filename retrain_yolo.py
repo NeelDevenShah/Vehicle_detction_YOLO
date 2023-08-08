@@ -91,25 +91,18 @@ def get_anchors(anchors_path):
 
 def process_data(images, boxes=None):
     '''Process the data'''
-    print('1-----------------------')
     # images_list = [i for i in images]
     images_list = [Image.fromarray(np.frombuffer(
         i.tobytes(), dtype=np.uint8)) for i in images]
     orig_size = np.array([images_list[0].width, images_list[0].height])
     orig_size = np.expand_dims(orig_size, axis=0)
 
-    print('2-----------------------')
-
     # Image Preprocessing
     processed_images = [i.resize((416, 416), Image.Resampling.BICUBIC)
                         for i in images_list]
-    print('*1')
     processed_images = [np.array(image, dtype=np.float)
                         for image in processed_images]
-    print('*2')
     processed_images = [image/255. for image in processed_images]
-
-    print('3-----------------------')
 
     if boxes is not None:
         # Box preprocessing.
@@ -117,8 +110,6 @@ def process_data(images, boxes=None):
         boxes = [box.rehsape(-1, 5) for box in boxes]
         # Get extents as y_min, x_min, y_max, x_max, class for comparision with model output
         boxes_extents = [box[:, [2, 1, 4, 3, 0]] for box in boxes]
-
-        print('3.5-----------------------')
 
         # Get box parameters as x_center, y_center, box_width, box_height, class.
         boxes_xy = [0.5 * (box[:, 3:5] + box[:, 1:3]) for box in boxes]
@@ -128,15 +119,11 @@ def process_data(images, boxes=None):
         boxes = [np.concatenate(
             (boxes_xy[i], boxes_wh[i], box[:, 0:1]), axis=1) for i, box in enumerate(boxes)]
 
-        print('4-----------------------')
-
         # Find the max numbers of boxes
         max_boxes = 0
         for boxz in boxes:
             if boxz.shape[0] > max_boxes:
                 max_boxes = boxz.shape[0]
-
-        print('5-----------------------')
 
         # add zero pad for training
         for i, boxz in enumerate(boxes):
@@ -145,8 +132,6 @@ def process_data(images, boxes=None):
                     (max_boxes - boxz.shape[0], 5), dtype=np.float32)
                 # Stack arrays in sequence vertically (row wise).
                 boxes[i] = np.vstack((boxz, zero_padding))
-
-        print('6-----------------------')
 
         return np.array(processed_images), np.array(boxes)
     else:
