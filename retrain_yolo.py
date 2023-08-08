@@ -35,7 +35,7 @@ YOLO_ANCHORS = np.array(
 
 
 def _main(args):
-    print('File may take upto 20 mins to run, So keep calm it will run, And have a burger :)')
+    print('\n\nFile may take upto 20 mins to run, So keep calm it will run, And have a burger :)\n\n')
     data_path = os.path.expanduser(args.data_path)
     classes_path = os.path.expanduser(args.classes_path)
     anchors_path = os.path.expanduser(args.anchors_path)
