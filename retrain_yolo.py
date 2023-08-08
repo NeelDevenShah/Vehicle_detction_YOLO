@@ -6,6 +6,7 @@ import argparse
 import os
 import matplotlib.pyplot as plt
 import numpy as np
+import tqdm
 from PIL import Image
 import tensorflow as tf
 from keras import backend as K
@@ -22,6 +23,8 @@ from yolo_utils import draw_boxes
 """
 COMMAND FOR RUNNING THE FILE
 python retrain_yolo.py --data_path=data/images/data.npz --anchors_path=data/pretrained_model/yolo_anchors.txt --classes_path=data/pretrained_model/classes.txt
+
+File may take upto 20 mins to run, So keep calm it will run
 """
 
 # Default anchor boxes
@@ -32,6 +35,7 @@ YOLO_ANCHORS = np.array(
 
 
 def _main(args):
+    print('File may take upto 20 mins to run, So keep calm it will run, And have a burger :)')
     data_path = os.path.expanduser(args.data_path)
     classes_path = os.path.expanduser(args.classes_path)
     anchors_path = os.path.expanduser(args.anchors_path)
@@ -71,9 +75,11 @@ def _main(args):
 
 def get_classes(classes_path):
     '''loads the classes'''
+
     with open(classes_path) as f:
         class_names = f.readlines()
-    class_names = [c.strip() for c in class_names]
+    class_names = [c.strip()
+                   for c in tqdm.tqdm(class_names, desc="Loading classes")]
     return class_names
 
 
@@ -93,20 +99,22 @@ def process_data(images, boxes=None):
     '''Process the data'''
     # images_list = [i for i in images]
     images_list = [Image.fromarray(np.frombuffer(
-        i.tobytes(), dtype=np.uint8)) for i in images]
+        i.tobytes(), dtype=np.uint8)) for i in tqdm.tqdm(images, desc="Converting images to arrays")]
     orig_size = np.array([images_list[0].width, images_list[0].height])
     orig_size = np.expand_dims(orig_size, axis=0)
 
     # Image Preprocessing
     processed_images = [i.resize((416, 416), Image.Resampling.BICUBIC)
-                        for i in images_list]
+                        for i in tqdm.tqdm(images_list, desc="Resizing the images")]
     processed_images = [np.array(image, dtype=np.float)
-                        for image in processed_images]
+                        for image in tqdm.tqdm(processed_images, desc="Converting images to numpy array")]
     processed_images = [image/255. for image in processed_images]
 
     if boxes is not None:
         # Box preprocessing.
         # Original boxes stored as 1D list of class, x_min, y_min, x_max, y_max.
+        print("Working with boxes of images")
+
         boxes = [box.rehsape(-1, 5) for box in boxes]
         # Get extents as y_min, x_min, y_max, x_max, class for comparision with model output
         boxes_extents = [box[:, [2, 1, 4, 3, 0]] for box in boxes]
@@ -126,7 +134,7 @@ def process_data(images, boxes=None):
                 max_boxes = boxz.shape[0]
 
         # add zero pad for training
-        for i, boxz in enumerate(boxes):
+        for i, boxz in tqdm.tqdm(enumerate(boxes), "Doing padding of boxes if required"):
             if boxz.shape[0] < max_boxes:
                 zero_padding = np.zeros(
                     (max_boxes - boxz.shape[0], 5), dtype=np.float32)
@@ -141,7 +149,7 @@ def process_data(images, boxes=None):
 def get_detector_mask(boxes, anchors):
     detectors_mask = [0 for i in range(len(boxes))]
     matching_true_boxes = [0 for i in range(len(boxes))]
-    for i, box in enumerate(boxes):
+    for i, box in tqdm.tqdm(enumerate(boxes), desc="Detecting boxes in images"):
         detectors_mask[i], matching_true_boxes[i] = preprocess_true_boxes(box, anchors, [
                                                                           416, 416])
     return np.array(detectors_mask), np.array(matching_true_boxes)
